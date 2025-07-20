@@ -7,6 +7,33 @@ from parameter import *
 
 
 def get_cell_position_from_coords(coords, map_info, check_negative=True):
+    """
+    Converts world coordinates to cell positions based on map information.
+
+    Parameters
+    ----------
+    coords : np.ndarray
+        Array of coordinates to convert. Can be of shape (2,) for a single coordinate or (N, 2) for multiple coordinates.
+    map_info : object
+        An object containing map metadata, specifically `map_origin_x`, `map_origin_y`, and `cell_size` attributes.
+    check_negative : bool, optional
+        If True, asserts that all resulting cell positions are non-negative.
+
+    Returns
+    -------
+    np.ndarray or tuple
+        The cell position(s) as integer coordinates. Returns a single tuple for one coordinate, or an array of tuples for multiple coordinates.
+
+    Raises
+    ------
+    AssertionError
+        If `check_negative` is True and any resulting cell position is negative.
+
+    Notes
+    -----
+    - The function rounds the calculated cell positions to the nearest integer.
+    - If a single coordinate is provided, returns a single cell position; otherwise, returns an array of cell positions.
+    """
     single_cell = False
     if coords.flatten().shape[0] == 2:
         single_cell = True
@@ -27,6 +54,24 @@ def get_cell_position_from_coords(coords, map_info, check_negative=True):
         return cell_position
 
 def get_coords_from_cell_position(cell_position, map_info):
+    """
+    Converts cell positions to map coordinates based on map information.
+
+    Parameters:
+        cell_position (np.ndarray): Array of cell positions with shape (N, 2), where each row is (x, y).
+        map_info (object): An object containing map metadata with attributes:
+            - cell_size (float): Size of each cell in map units.
+            - map_origin_x (float): X-coordinate of the map origin.
+            - map_origin_y (float): Y-coordinate of the map origin.
+
+    Returns:
+        np.ndarray: Array of map coordinates corresponding to the input cell positions, rounded to one decimal place.
+                    If the number of coordinates equals OCCUPIED, returns the first coordinate only.
+
+    Notes:
+        - The function expects cell_position to be convertible to shape (-1, 2).
+        - OCCUPIED should be defined elsewhere in the codebase.
+    """
     cell_position = cell_position.reshape(-1, 2)
     cell_x = cell_position[:, 0]
     cell_y = cell_position[:, 1]
@@ -47,6 +92,20 @@ def get_free_area_coords(map_info):
 
 
 def get_free_and_connected_map(location, map_info):
+    """
+    Returns a boolean map indicating the free and connected area in the map starting from a given location.
+
+    Args:
+        location (tuple or list): The coordinates (x, y) representing the starting location.
+        map_info (object): An object containing the map data and relevant attributes. Must have a 'map' attribute.
+
+    Returns:
+        numpy.ndarray: A boolean array where True values indicate free and connected cells accessible from the given location.
+
+    Notes:
+        - The function assumes the existence of constants and functions such as FREE, label, and get_cell_position_from_coords.
+        - Connectivity is determined using 8-connectivity (connectivity=2).
+    """
     free = (map_info.map == FREE).astype(float)
     labeled_free = label(free, connectivity=2)
     cell = get_cell_position_from_coords(location, map_info)
@@ -55,6 +114,28 @@ def get_free_and_connected_map(location, map_info):
     return connected_free_map
 
 def get_updating_node_coords(location, updating_map_info, check_connectivity=True):
+    """
+    Generates a list of node coordinates within a map region that are either free or free and connected, 
+    depending on the connectivity check.
+
+    Args:
+        location (tuple or array-like): The reference location used for connectivity checking.
+        updating_map_info (object): An object containing map information, including origin coordinates, 
+            map shape, and the map array itself.
+        check_connectivity (bool, optional): If True, only nodes that are both free and connected are returned.
+            If False, only free nodes are returned. Defaults to True.
+
+    Returns:
+        nodes (np.ndarray): Array of shape (N, 2) containing the coordinates of the selected nodes.
+        free_connected_map (np.ndarray or None): Array representing the free and connected map if 
+            check_connectivity is True, otherwise None.
+
+    Notes:
+        - The function aligns the map boundaries to the node resolution.
+        - Node coordinates are rounded to one decimal place.
+        - Requires global constants: CELL_SIZE, NODE_RESOLUTION, FREE.
+        - Depends on helper functions: get_cell_position_from_coords, get_free_and_connected_map.
+    """
     x_min = updating_map_info.map_origin_x
     y_min = updating_map_info.map_origin_y
     x_max = updating_map_info.map_origin_x + (updating_map_info.map.shape[1] - 1) * CELL_SIZE
@@ -104,14 +185,26 @@ def get_updating_node_coords(location, updating_map_info, check_connectivity=Tru
     return nodes, free_connected_map
 
 def get_frontier_in_map(map_info):
+    '''
+    Get frontier cells in the map.
+    '''
     x_len = map_info.map.shape[1]
     y_len = map_info.map.shape[0]
+     # create a binary map where UNKNOWN cells are 1 and others are 0
     unknown = (map_info.map == UNKNOWN) * 1
+    # Pad the unknown map by 1 cell on each side to prevent out-of-bounds errors
     unknown = np.lib.pad(unknown, ((1, 1), (1, 1)), 'constant', constant_values=0)
+
+    # Calculate the number of unknown neighbors for each interior cell of the map
+    # The sum of these neighbors gives the number of unknown neighbors for each cell
+    # The result is a matrix where each cell contains the count of unknown neighbors
+    # unknown[2:][:, 1:x_len + 1] checks the cell below (chain indexing)
+    # unknown[:y_len][:, 1:x_len + 1] checks the cell on top (note y_len is the pre-padded height i.e. unknown.shape[0] - 2)
     unknown_neighbor = unknown[2:][:, 1:x_len + 1] + unknown[:y_len][:, 1:x_len + 1] + unknown[1:y_len + 1][:, 2:] \
                        + unknown[1:y_len + 1][:, :x_len] + unknown[:y_len][:, 2:] + unknown[2:][:, :x_len] + \
                        unknown[2:][:, 2:] + unknown[:y_len][:, :x_len]
     free_cell_indices = np.where(map_info.map.ravel(order='F') == FREE)[0]
+    # frontier cells defined as cells with 2 to 7 unknown neighbors (inclusive)
     frontier_cell_1 = np.where(1 < unknown_neighbor.ravel(order='F'))[0]
     frontier_cell_2 = np.where(unknown_neighbor.ravel(order='F') < 8)[0]
     frontier_cell_indices = np.intersect1d(frontier_cell_1, frontier_cell_2)

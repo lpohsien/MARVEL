@@ -39,6 +39,7 @@ class Env:
         self.cell_size = CELL_SIZE  # meter
 
         self.robot_belief = np.ones(self.ground_truth_size) * 127
+        # map origin is set at the initial position of the robot
         self.belief_origin_x = -np.round(initial_cell[0] * self.cell_size, 1)   # meter
         self.belief_origin_y = -np.round(initial_cell[1] * self.cell_size, 1)  # meter
 
@@ -80,15 +81,20 @@ class Env:
         map_list = os.listdir(map_dir)
         name = map_list[map_index]
         ground_truth = (io.imread(map_dir + '/' + name, 1)).astype(int)
+        # ground_truth.shape: (height, width)
 
         ground_truth = block_reduce(ground_truth, 2, np.min)
 
+        # robot intial position is marked by pixel value 208
+        # take a sample of the pixels as the exact robot cell
         robot_cell = np.array(np.nonzero(ground_truth == 208))
         robot_cell = np.array([robot_cell[1, 10], robot_cell[0, 10]])
 
         ground_truth = (ground_truth > 150) | ((ground_truth <= 80) & (ground_truth >= 50))
         ground_truth = ground_truth * 254 + 1
 
+        # ground_truth.shape: (height // 2, width // 2)
+        # robot_cell: (2, ) coordinates of the robot cell in the ground truth map
         return ground_truth, robot_cell
 
     def update_robot_location(self, robot_location):

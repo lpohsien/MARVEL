@@ -55,7 +55,9 @@ class Agent:
         self.updating_map_size = UPDATING_MAP_SIZE
 
         # map and updating map
+        # global map as seen by the agent
         self.map_info = None
+        # subregion of the global map centered around the agent's location, used for local computations
         self.updating_map_info = None
 
         # frontiers
@@ -88,13 +90,37 @@ class Agent:
 
 
     def update_map(self, map_info):
+        """
+        Updates the agent's global map.
+
+        Args:
+            map_info: The new map information to be assigned to the agent.
+        """
         # no need in training because of shallow copy
         self.map_info = map_info
 
     def update_updating_map(self, location):
+        """
+        Updates the `updating_map_info` attribute with the latest map information for the given location.
+
+        Args:
+            location: The location for which to retrieve and update the map information.
+        """
         self.updating_map_info = self.get_updating_map(location)
 
     def update_location(self, location):
+        """
+        Updates the agent's current location and records the traveled distance.
+
+        Args:
+            location : np.ndarray
+                The new location of the agent as a NumPy array.
+        Notes:
+            - Calculates the distance traveled from the previous location to the new location and updates the total travel distance.
+            - Updates the agent's current location.
+            - Marks the corresponding node as visited using the agent's heading, if nodes exist.
+            - Appends the new location coordinates to the trajectory lists for plotting, if plotting is enabled.
+        """
         if self.location is None:
             dist = 0
         else:
@@ -114,6 +140,16 @@ class Agent:
             self.trajectory_y.append(location[1])
 
     def update_frontiers(self):
+        """
+        Updates the agent's local frontier `Agent.frontier` based on the agent's local submap.
+
+        Returns:
+            None
+
+        Notes:
+            - Uses local submap `Agent.updating_map_info` to determine frontiers.
+            - Calls `get_frontier_in_map` to compute the frontiers.
+        """
         self.frontier = get_frontier_in_map(self.updating_map_info)
 
     def update_heading(self, heading):
@@ -121,6 +157,23 @@ class Agent:
         self.heading = heading
         
     def get_updating_map(self, location):
+        """
+        Generates a subregion of the global map centered around the given location, 
+        constrained by the map boundaries and aligned to the cell grid.
+
+        Args:
+            location (tuple or list): The (x, y) coordinates around which to center the updating map.
+
+        Returns:
+            MapInfo: An object containing the subregion map array, its origin coordinates, 
+                     and cell size information.
+
+        Notes:
+            - The subregion size is determined by Agent.updating_map_size.
+            - The subregion is clipped to the global map boundaries.
+            - The origin and top coordinates are aligned to the cell grid.
+            - origin is set to global coordinates of `location` & at the center of the subregion.
+        """
         updating_map_origin_x = (location[0] - self.updating_map_size / 2)
         updating_map_origin_y = (location[1] - self.updating_map_size / 2)
 
