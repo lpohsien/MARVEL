@@ -1,0 +1,13 @@
+[project]
+name = "marvel"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = "==3.11.8"
+dependencies = [
+    "matplotlib==3.10.0",
+    "numpy==1.26.4",
+    "scikit-image==0.25.0",
+    "shapely==2.0.4",
+    "torch==2.5.1",
+]
